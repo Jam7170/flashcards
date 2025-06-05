@@ -152,7 +152,7 @@ class RenderFlashcardPack extends RenderBox {
       final canvas = context.canvas;
 
       // Card parameters
-      const double cardWidth = 260;
+      const double cardWidth = 250;
       const double cardHeight = 120;
       const double cardThickness = 2;
       final int count = cardCount;

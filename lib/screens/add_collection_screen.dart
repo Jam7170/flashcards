@@ -2,6 +2,7 @@ import 'package:drift/drift.dart' hide Column;
 import 'package:flashcards/data/database.dart';
 import 'package:flutter/material.dart';
 import 'package:flashcards/global.dart';
+import 'package:uuid/uuid.dart';
 
 class AddCollectionScreen extends StatefulWidget {
   const AddCollectionScreen({super.key});
@@ -74,9 +75,19 @@ class _AddCollectionScreenState extends State<AddCollectionScreen> {
       final name = _nameController.text;
       final description = _descriptionController.text;
 
+      final collectionId = const Uuid().v4();
+
       await appDatabase.into(appDatabase.cardCollections).insert(CardCollectionsCompanion.insert(
+            id: Value(collectionId),
             name: name,
             description: Value(description),
+          ));
+
+      // Add single test flashcard to the new collection
+      await appDatabase.into(appDatabase.flashcards).insert(FlashcardsCompanion.insert(
+            frontText: 'Sample Question',
+            backText: 'Sample Answer',
+            collectionId: collectionId,
           ));
 
       if (mounted) Navigator.pop(context);

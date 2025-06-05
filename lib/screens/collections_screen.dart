@@ -6,6 +6,8 @@ import 'package:flashcards/screens/add_collection_screen.dart';
 import 'package:flashcards/widgets/flashcard_pack.dart';
 import 'package:flutter/material.dart';
 
+typedef CardCollectionAndCard = ({CardCollection collection, Flashcard? flashcard});
+
 class CollectionsScreen extends StatefulWidget {
   const CollectionsScreen({super.key});
 
@@ -16,12 +18,40 @@ class CollectionsScreen extends StatefulWidget {
 class _CollectionsScreenState extends State<CollectionsScreen> {
   int _hoveredIndex = -1;
 
-  late Stream<List<CardCollection>> _collectionsStream;
+  late Stream<List<CardCollectionAndCard>> _collectionsStream;
+
+  void _getStream() {
+    _collectionsStream = appDatabase.cardCollections.select().watch().asyncMap((collections) async {
+      final List<CardCollectionAndCard> collectionsWithCards = [];
+      for (final collection in collections) {
+        final flashcard = (await (appDatabase.flashcards.select()
+                  ..where(
+                    (tbl) => tbl.collectionId.equals(collection.id),
+                  ))
+                .get())
+            .firstOrNull;
+        collectionsWithCards.add((collection: collection, flashcard: flashcard));
+      }
+      return collectionsWithCards;
+    });
+  }
 
   @override
   void initState() {
     super.initState();
-    _collectionsStream = appDatabase.cardCollections.select().watch();
+    _getStream();
+  }
+
+  @override
+  void dispose() {
+    _collectionsStream.drain();
+    super.dispose();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _getStream();
   }
 
   @override
@@ -31,17 +61,18 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
         title: const Text('Collections'),
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          Navigator.push(
+        onPressed: () async {
+          await Navigator.push(
             context,
             MaterialPageRoute(
               builder: (context) => const AddCollectionScreen(),
             ),
           );
+          _getStream();
         },
         child: const Icon(Icons.add),
       ),
-      body: StreamBuilder<List<CardCollection>>(
+      body: StreamBuilder<List<CardCollectionAndCard>>(
         stream: _collectionsStream,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
@@ -52,12 +83,14 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
             return const Center(child: Text('No collections found.'));
           }
 
-          final collections = snapshot.data!;
+          final collectionsAndCards = snapshot.data!;
 
           return ListView.builder(
-            itemCount: collections.length,
+            itemCount: collectionsAndCards.length,
             itemBuilder: (context, index) {
-              final collection = collections[index];
+              final data = collectionsAndCards[index];
+              final (:collection, :flashcard) = data;
+              print('Collection: ${collection.name}, Flashcard: ${flashcard?.frontText ?? "No flashcard"}');
               return MouseRegion(
                 cursor: SystemMouseCursors.click,
                 onEnter: (_) => setState(() => _hoveredIndex = index),
@@ -68,7 +101,7 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
                   builder: (context, value, _) {
                     return FlashcardPack(
                       title: collection.name,
-                      cardText: '',
+                      cardText: flashcard?.frontText,
                       boxColor: Theme.of(context).colorScheme.surfaceContainer,
                       cardColors: [Colors.grey[200]!],
                       frontCardHeight: value,
